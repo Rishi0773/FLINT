@@ -1,6 +1,6 @@
 # FLINT
 
-FLINT is a personal AI assistant running on Windows, powered by the Gemini Live API with real-time voice interaction and a wide set of built-in actions.
+FLINT is a personal AI assistant running on Windows, Mac or Linux powered by the Gemini Live API with real-time voice interaction and a wide set of built-in actions.
 
 ## Features
 
