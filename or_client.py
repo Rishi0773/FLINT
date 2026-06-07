@@ -354,8 +354,8 @@ if __name__ == "__main__":
     try:
         history = [
             {"role": "system",    "content": "You are a helpful assistant. Be brief."},
-            {"role": "user",      "content": "My name is Tushar."},
-            {"role": "assistant", "content": "Hello Tushar, how can I help you?"},
+            {"role": "user",      "content": "My name is Rishi."},
+            {"role": "assistant", "content": "Hello Rishi, how can I help you?"},
             {"role": "user",      "content": "What is my name?"},
         ]
         reply = client.multi_turn(history)

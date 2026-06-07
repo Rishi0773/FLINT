@@ -1591,7 +1591,7 @@ class MainWindow(QMainWindow):
 
         lay.addWidget(_fl("[F4] Mute  ·  [F11] Fullscreen"))
         lay.addStretch()
-        lay.addWidget(_fl("Tushar Industries  ·  AXIOM  ·  CLASSIFIED",
+        lay.addWidget(_fl("Rishi Industries  ·  AXIOM  ·  CLASSIFIED",
                           C.BORDER_B))
         lay.addStretch()
         lay.addWidget(_fl("© STARK INDUSTRIES", C.PRI_DIM))

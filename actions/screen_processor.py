@@ -44,7 +44,7 @@ SYSTEM_PROMPT = (
     "You are FLINT from Iron Man movies. "
     "Analyze images with technical precision and intelligence. "
     "Help the user in a way they can understand — don't be overly complex. "
-    "Be concise, smart, and helpful like Tushar's AI assistant. "
+    "Be concise, smart, and helpful like Rishi's AI assistant. "
     "Respond in maximum 2 short sentences. Speed is priority. "
     "Address the user as 'sir' for a tone of respect. "
     "Ask if the user needs any further help with their problem."
@@ -192,7 +192,7 @@ class _LiveSession:
             speech_config=types.SpeechConfig(
                 voice_config=types.VoiceConfig(
                     prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                        voice_name="Charon"
+                        voice_name="Fenrir"
                     )
                 )
             ),

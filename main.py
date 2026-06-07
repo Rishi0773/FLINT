@@ -754,6 +754,7 @@ class FlintLive:
                 async for response in self.session.receive():
 
                     if response.data:
+                        self.set_speaking(True)
                         self.audio_in_queue.put_nowait(response.data)
 
                     if response.server_content:
@@ -807,7 +808,6 @@ class FlintLive:
 
     async def _play_audio(self):
         print("[FLINT] 🔊 Play started")
-        loop = asyncio.get_event_loop()
 
         stream = sd.RawOutputStream(
             samplerate=RECEIVE_SAMPLE_RATE,
@@ -819,13 +819,11 @@ class FlintLive:
         try:
             while True:
                 chunk = await self.audio_in_queue.get()
-                self.set_speaking(True)
                 await asyncio.to_thread(stream.write, chunk)
         except Exception as e:
             print(f"[FLINT] ❌ Play: {e}")
             raise
         finally:
-            self.set_speaking(False)
             stream.stop()
             stream.close()
 
