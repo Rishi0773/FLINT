@@ -17,7 +17,7 @@ FLINT is a personal AI assistant running on Windows, powered by the Gemini Live 
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/Hrishikesh2512/FLINT.git
+git clone https://github.com/Rishi0773/FLINT.git
 cd FLINT
 ```
 
