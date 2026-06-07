@@ -4,13 +4,13 @@ FLINT is a personal AI assistant running on Windows, powered by the Gemini Live 
 
 ## Features
 
-- **Live voice conversation** — real-time audio in/out via Gemini Live
-- **Tool-calling** — open apps, search the web, control your browser, manage files, send messages, set reminders, control your computer, and more
-- **Screen & camera vision** — FLINT can see your screen or webcam on demand
-- **Memory** — remembers things you tell it across sessions
-- **Agent tasks** — multi-step autonomous task execution
-- **Game management** — Steam & Epic Games integration
-- **File processing** — images, PDFs, audio, video, code, spreadsheets, and more
+- **Live voice conversation**: real-time audio in/out via Gemini Live
+- **Tool-calling**: open apps, search the web, control your browser, manage files, send messages, set reminders, control your computer, and more
+- **Screen & camera vision**: FLINT can see your screen or webcam on demand
+- **Memory**: remembers things you tell it across sessions
+- **Agent tasks**: multi-step autonomous task execution
+- **Game management**: Steam & Epic Games integration
+- **File processing**: images, PDFs, audio, video, code, spreadsheets, and more
 
 ## Setup
 
@@ -52,8 +52,8 @@ Then edit `config/api_keys.json`:
 }
 ```
 
-- **Gemini API key** — get one at [aistudio.google.com](https://aistudio.google.com)
-- **OpenRouter API key** — get one at [openrouter.ai](https://openrouter.ai) (used for agent tasks)
+- **Gemini API key**: get one at [aistudio.google.com](https://aistudio.google.com)
+- **OpenRouter API key**: get one at [openrouter.ai](https://openrouter.ai) (used for agent tasks)
 
 ### 5. Run
 
@@ -69,5 +69,5 @@ python main.py
 
 ## Notes
 
-- `config/api_keys.json` is gitignored — never commit your real keys
-- `core/prompt.txt` contains FLINT's personality — feel free to customise it
+- `config/api_keys.json` is gitignored: never commit your real keys
+- `core/prompt.txt` contains FLINT's personality: feel free to customise it
