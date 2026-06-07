@@ -12,7 +12,7 @@ FLINT is a personal AI assistant running on Windows, powered by the Gemini Live 
 - **Game management**: Steam & Epic Games integration
 - **File processing**: images, PDFs, audio, video, code, spreadsheets, and more
 
-## Setup
+## Setup 
 
 ### 1. Clone the repo
 
