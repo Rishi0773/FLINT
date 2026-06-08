@@ -71,3 +71,9 @@ python main.py
 
 - `config/api_keys.json` is gitignored: never commit your real keys
 - `core/prompt.txt` contains FLINT's personality: feel free to customise it
+
+
+## License
+
+Copyright © 2026 Hrishikesh Jha • Apache 2.0
+
