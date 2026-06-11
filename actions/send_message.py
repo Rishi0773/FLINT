@@ -1,8 +1,3 @@
-# actions/send_message.py
-# Universal messaging — WhatsApp & Instagram
-# Uses visual element detection (pyautogui + screen search) instead of
-# hardcoded tab/click sequences — works on any screen resolution.
-
 import time
 import pyautogui
 from pathlib import Path
@@ -10,66 +5,134 @@ from pathlib import Path
 pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0.08
 
-def _open_app(app_name: str) -> bool:
-    """Opens an app via Windows search."""
+try:
+    from actions.open_app import open_app as _open_app_module
+    _HAS_OPEN_APP = True
+except ImportError:
+    _HAS_OPEN_APP = False
+
+
+# ---------------------------------------------------------------------------
+# WhatsApp — keyed exactly on what the debug showed
+# ---------------------------------------------------------------------------
+
+_WA_PROCESS = "whatsapp.root.exe"   # exact name psutil sees
+_WA_HWND_PID = None                 # cached after first focus
+
+
+def _is_whatsapp_running() -> bool:
     try:
-        pyautogui.press("win")
-        time.sleep(0.4)
-        pyautogui.write(app_name, interval=0.04)
-        time.sleep(0.5)
-        pyautogui.press("enter")
-        time.sleep(2.0)  
-        return True
+        import psutil
+        for p in psutil.process_iter(["name"]):
+            try:
+                if p.info["name"].lower() == _WA_PROCESS:
+                    return True
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return False
+
+
+def _get_whatsapp_hwnd():
+    """
+    Returns (hwnd, title) for the real WhatsApp Desktop window.
+    Matches by:
+      - process name == WhatsApp.Root.exe   (exact, from debug output)
+      - window is visible and has a non-empty title
+    Excludes msedgewebview2 / chrome / anything not WhatsApp.Root.exe.
+    """
+    try:
+        import win32gui
+        import win32process
+        import psutil
+
+        result = [None, ""]
+
+        def _cb(hwnd, _):
+            if result[0]:           # already found
+                return
+            if not win32gui.IsWindowVisible(hwnd):
+                return
+            title = win32gui.GetWindowText(hwnd).strip()
+            if not title:
+                return
+            try:
+                _, pid  = win32process.GetWindowThreadProcessId(hwnd)
+                pname   = psutil.Process(pid).name().lower()
+                if pname == _WA_PROCESS:          # exact match only
+                    result[0] = hwnd
+                    result[1] = title
+            except Exception:
+                pass
+
+        win32gui.EnumWindows(_cb, None)
+        return result[0], result[1]
+
+    except ImportError:
+        return None, ""
+
+
+def _focus_whatsapp() -> tuple:
+    """Force-focus the WhatsApp window. Returns (hwnd, title)."""
+    try:
+        import win32gui
+        import win32con
+
+        hwnd, title = _get_whatsapp_hwnd()
+        if hwnd:
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+            win32gui.SetForegroundWindow(hwnd)
+            time.sleep(0.7)
+            # re-read title after focus (chat title may now be visible)
+            title = win32gui.GetWindowText(hwnd).strip()
+        return hwnd, title
+
     except Exception as e:
-        print(f"[SendMessage] Could not open {app_name}: {e}")
-        return False
-
-
-def _search_contact(contact: str, platform: str):
-    """
-    Searches for a contact inside the messaging app.
-    Uses Ctrl+F (universal search shortcut) then types contact name.
-    """
-    time.sleep(0.5)
-    pyautogui.hotkey("ctrl", "f")
-    time.sleep(0.4)
-    pyautogui.hotkey("ctrl", "a")
-    pyautogui.write(contact, interval=0.04)
-    time.sleep(0.8)
-    pyautogui.press("enter")
-    time.sleep(0.6)
-
-
-def _type_and_send(message: str):
-    """Types message and sends it."""
-    pyautogui.press("tab")
-    time.sleep(0.2)
-    pyautogui.hotkey("ctrl", "a")
-    pyautogui.write(message, interval=0.03)
-    time.sleep(0.2)
-    pyautogui.press("enter")
-    time.sleep(0.3)
+        print(f"[SendMessage] focus error: {e}")
+        return None, ""
 
 
 def _send_whatsapp(receiver: str, message: str) -> str:
-    """
-    Sends a WhatsApp message via the Windows desktop app.
-    Steps: Open WhatsApp → Search contact → Click → Type → Send
-    """
     try:
-        if not _open_app("WhatsApp"):
-            return "Could not open WhatsApp."
+        if not _is_whatsapp_running():
+            print("[SendMessage] WhatsApp not running → launching")
+            if _HAS_OPEN_APP:
+                _open_app_module({"app_name": "whatsapp"})
+            else:
+                pyautogui.press("win")
+                time.sleep(0.4)
+                pyautogui.write("WhatsApp", interval=0.04)
+                time.sleep(0.5)
+                pyautogui.press("enter")
+            time.sleep(2.5)
 
-        time.sleep(1.5)
+        hwnd, title = _focus_whatsapp()
+        print(f"[SendMessage] HWND={hwnd} title='{title}'")
 
-        pyautogui.hotkey("ctrl", "f")
-        time.sleep(0.4)
-        pyautogui.hotkey("ctrl", "a")
-        pyautogui.write(receiver, interval=0.04)
-        time.sleep(1.0)
+        if not hwnd:
+            return "Could not find or focus WhatsApp window."
 
-        pyautogui.press("enter")
-        time.sleep(0.8)
+        # Determine if already in the right chat
+        # Title is either "WhatsApp" (home) or "<Name> - WhatsApp" (in chat)
+        if " - WhatsApp" in title:
+            open_contact = title.replace(" - WhatsApp", "").strip().lower()
+        else:
+            open_contact = ""
+
+        already_in_chat = open_contact == receiver.strip().lower()
+
+        if already_in_chat:
+            print(f"[SendMessage] Already in {receiver}'s chat — skipping search")
+        else:
+            print(f"[SendMessage] Searching for: {receiver}")
+            pyautogui.hotkey("ctrl", "f")
+            time.sleep(0.5)
+            pyautogui.hotkey("ctrl", "a")
+            pyautogui.write(receiver, interval=0.04)
+            time.sleep(1.0)
+            pyautogui.press("enter")
+            time.sleep(0.8)
 
         pyautogui.write(message, interval=0.03)
         time.sleep(0.2)
@@ -81,76 +144,67 @@ def _send_whatsapp(receiver: str, message: str) -> str:
         return f"WhatsApp error: {e}"
 
 
+# ---------------------------------------------------------------------------
+# Other platforms
+# ---------------------------------------------------------------------------
+
+def _open_app(app_name: str):
+    if _HAS_OPEN_APP:
+        _open_app_module({"app_name": app_name})
+    else:
+        pyautogui.press("win")
+        time.sleep(0.4)
+        pyautogui.write(app_name, interval=0.04)
+        time.sleep(0.5)
+        pyautogui.press("enter")
+        time.sleep(2.5)
+
+
 def _send_instagram(receiver: str, message: str) -> str:
-    """
-    Sends an Instagram DM via browser (instagram.com).
-    Steps: Open Chrome → Go to instagram.com/direct → Search contact → Send
-    """
     try:
         import webbrowser
-
         webbrowser.open("https://www.instagram.com/direct/new/")
         time.sleep(3.5)
-
         pyautogui.write(receiver, interval=0.05)
         time.sleep(1.5)
-
         pyautogui.press("down")
         time.sleep(0.3)
         pyautogui.press("enter")
         time.sleep(0.5)
-
         for _ in range(3):
             pyautogui.press("tab")
             time.sleep(0.1)
         pyautogui.press("enter")
         time.sleep(1.5)
-
         pyautogui.write(message, interval=0.04)
         time.sleep(0.2)
         pyautogui.press("enter")
-
         return f"Message sent to {receiver} via Instagram."
-
     except Exception as e:
         return f"Instagram error: {e}"
 
+
 def _send_telegram(receiver: str, message: str) -> str:
-    """Sends a Telegram message via Windows desktop app."""
     try:
-        if not _open_app("Telegram"):
-            return "Could not open Telegram."
-
+        _open_app("telegram")
         time.sleep(1.5)
-
         pyautogui.hotkey("ctrl", "f")
         time.sleep(0.4)
         pyautogui.write(receiver, interval=0.04)
         time.sleep(1.0)
         pyautogui.press("enter")
         time.sleep(0.8)
-
         pyautogui.write(message, interval=0.03)
         time.sleep(0.2)
         pyautogui.press("enter")
-
         return f"Message sent to {receiver} via Telegram."
-
     except Exception as e:
         return f"Telegram error: {e}"
 
 
-
 def _send_generic(platform: str, receiver: str, message: str) -> str:
-    """
-    For any other platform not explicitly supported.
-    Opens the app, searches for contact, types and sends.
-    Works for: Messenger, Discord, Signal, etc.
-    """
     try:
-        if not _open_app(platform):
-            return f"Could not open {platform}."
-
+        _open_app(platform)
         time.sleep(1.5)
         pyautogui.hotkey("ctrl", "f")
         time.sleep(0.4)
@@ -161,11 +215,14 @@ def _send_generic(platform: str, receiver: str, message: str) -> str:
         pyautogui.write(message, interval=0.03)
         time.sleep(0.2)
         pyautogui.press("enter")
-
         return f"Message sent to {receiver} via {platform}."
-
     except Exception as e:
         return f"{platform} error: {e}"
+
+
+# ---------------------------------------------------------------------------
+# Public entry point
+# ---------------------------------------------------------------------------
 
 def send_message(
     parameters: dict,
@@ -173,15 +230,6 @@ def send_message(
     player=None,
     session_memory=None
 ) -> str:
-    """
-    Called from main.py.
-
-    parameters:
-        receiver     : Contact name to send to
-        message_text : The message content
-        platform     : whatsapp | instagram | telegram | <any app name>
-                       Default: whatsapp
-    """
     params       = parameters or {}
     receiver     = params.get("receiver", "").strip()
     message_text = params.get("message_text", "").strip()
@@ -198,13 +246,10 @@ def send_message(
 
     if "whatsapp" in platform or "wp" in platform or "wapp" in platform:
         result = _send_whatsapp(receiver, message_text)
-
     elif "instagram" in platform or "ig" in platform or "insta" in platform:
         result = _send_instagram(receiver, message_text)
-
     elif "telegram" in platform or "tg" in platform:
         result = _send_telegram(receiver, message_text)
-
     else:
         result = _send_generic(platform, receiver, message_text)
 
