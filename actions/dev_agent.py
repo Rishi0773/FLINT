@@ -24,10 +24,11 @@ def _get_api_key() -> str:
         return json.load(f)["gemini_api_key"]
 
 
-def _get_model(model_name: str):
-    import google.generativeai as genai
-    genai.configure(api_key=_get_api_key())
-    return genai.GenerativeModel(model_name)
+from google import genai
+
+
+def _get_client() -> genai.Client:
+    return genai.Client(api_key=_get_api_key())
 
 
 def _strip_fences(text: str) -> str:
@@ -97,7 +98,7 @@ class RateLimitError(Exception):
 
 
 def _plan_project(description: str, language: str) -> dict:
-    model = _get_model(MODEL_PLANNER)
+    client = _get_client()
 
     prompt = f"""You are a senior software architect. Create a minimal, complete file plan for this project.
 
@@ -135,7 +136,10 @@ Critical rules:
 JSON:"""
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model=MODEL_PLANNER,
+            contents=prompt
+        )
         raw = _strip_fences(response.text)
         return json.loads(raw)
     except json.JSONDecodeError as e:
@@ -153,7 +157,7 @@ def _write_file(
     project_dir: Path,
     already_written: dict[str, str],
 ) -> str:
-    model = _get_model(MODEL_WRITER)
+    client = _get_client()
 
     file_path = file_info["path"]
     file_desc = file_info.get("description", "")
@@ -214,7 +218,10 @@ General rules:
 Code for {file_path}:"""
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model=MODEL_WRITER,
+            contents=prompt
+        )
         code = _strip_fences(response.text)
 
         full_path = project_dir / file_path

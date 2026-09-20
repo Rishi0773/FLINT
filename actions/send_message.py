@@ -1,5 +1,7 @@
-import time
+﻿import time
 import pyautogui
+
+from actions.open_app import _say, _is_cloaked
 from pathlib import Path
 
 pyautogui.FAILSAFE = True
@@ -54,6 +56,8 @@ def _get_whatsapp_hwnd():
                 return
             if not win32gui.IsWindowVisible(hwnd):
                 return
+            if _is_cloaked(hwnd):   # suspended/tray ghost frame — not focusable
+                return
             title = win32gui.GetWindowText(hwnd).strip()
             if not title:
                 return
@@ -73,30 +77,85 @@ def _get_whatsapp_hwnd():
         return None, ""
 
 
-def _focus_whatsapp() -> tuple:
-    """Force-focus the WhatsApp window. Returns (hwnd, title)."""
+def _wait_for_whatsapp_hwnd(timeout: float = 2.0, poll: float = 0.3) -> tuple:
+    """Poll until WhatsApp's window handle exists, or timeout. (hwnd, title)."""
+    deadline = time.time() + timeout
+    while True:
+        hwnd, title = _get_whatsapp_hwnd()
+        if hwnd:
+            return hwnd, title
+        if time.time() >= deadline:
+            return None, ""
+        time.sleep(poll)
+
+
+def _focus_whatsapp(timeout: float = 2.0) -> tuple:
+    """Force-focus the WhatsApp window with retry + validation.
+
+    Waits up to `timeout` for the window to exist (fresh launches draw the
+    window late), then forces foreground and confirms the handle is still
+    valid AND actually frontmost before returning it.  Returns (hwnd, title);
+    (None, "") only after the full timeout elapses.
+    """
     try:
         import win32gui
         import win32con
 
-        hwnd, title = _get_whatsapp_hwnd()
-        if hwnd:
-            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-            win32gui.SetForegroundWindow(hwnd)
-            time.sleep(0.7)
-            # re-read title after focus (chat title may now be visible)
-            title = win32gui.GetWindowText(hwnd).strip()
-        return hwnd, title
+        hwnd, title = _wait_for_whatsapp_hwnd(timeout)
+        if not hwnd:
+            return None, ""
+
+        for attempt in range(4):
+            try:
+                win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+                if attempt > 0:
+                    # transient ALT press releases Windows' foreground lock,
+                    # which blocks SetForegroundWindow right after a launch
+                    try:
+                        import win32api
+                        win32api.keybd_event(win32con.VK_MENU, 0, 0, 0)
+                        win32api.keybd_event(win32con.VK_MENU, 0,
+                                             win32con.KEYEVENTF_KEYUP, 0)
+                    except Exception:
+                        pass
+                win32gui.SetForegroundWindow(hwnd)
+            except Exception as e:
+                _say(f"[SendMessage] focus attempt {attempt + 1} failed: {e}")
+            time.sleep(0.5)
+
+            if not win32gui.IsWindow(hwnd):
+                # window died (e.g. splash screen closed) — re-acquire it
+                hwnd, title = _wait_for_whatsapp_hwnd(timeout=1.0)
+                if not hwnd:
+                    return None, ""
+                continue
+            if win32gui.GetForegroundWindow() == hwnd:
+                # re-read title after focus (chat title may now be visible)
+                return hwnd, win32gui.GetWindowText(hwnd).strip()
+
+        _say("[SendMessage] ⚠️ Window valid but foreground unconfirmed")
+        return None, ""
 
     except Exception as e:
-        print(f"[SendMessage] focus error: {e}")
+        _say(f"[SendMessage] focus error: {e}")
         return None, ""
+
+
+def _whatsapp_still_focused(hwnd) -> bool:
+    """True if hwnd is still a live window holding the foreground."""
+    try:
+        import win32gui
+        return (bool(hwnd) and win32gui.IsWindow(hwnd)
+                and win32gui.GetForegroundWindow() == hwnd)
+    except Exception:
+        return True            # can't verify — don't block the send
 
 
 def _send_whatsapp(receiver: str, message: str) -> str:
     try:
-        if not _is_whatsapp_running():
-            print("[SendMessage] WhatsApp not running → launching")
+        fresh_launch = not _is_whatsapp_running()
+        if fresh_launch:
+            _say("[SendMessage] WhatsApp not running → launching")
             if _HAS_OPEN_APP:
                 _open_app_module({"app_name": "whatsapp"})
             else:
@@ -105,10 +164,11 @@ def _send_whatsapp(receiver: str, message: str) -> str:
                 pyautogui.write("WhatsApp", interval=0.04)
                 time.sleep(0.5)
                 pyautogui.press("enter")
-            time.sleep(2.5)
 
-        hwnd, title = _focus_whatsapp()
-        print(f"[SendMessage] HWND={hwnd} title='{title}'")
+        # Fresh UWP launches draw the window late — give them a longer
+        # validation window before declaring failure.
+        hwnd, title = _focus_whatsapp(timeout=8.0 if fresh_launch else 2.0)
+        _say(f"[SendMessage] HWND={hwnd} title='{title}'")
 
         if not hwnd:
             return "Could not find or focus WhatsApp window."
@@ -123,9 +183,9 @@ def _send_whatsapp(receiver: str, message: str) -> str:
         already_in_chat = open_contact == receiver.strip().lower()
 
         if already_in_chat:
-            print(f"[SendMessage] Already in {receiver}'s chat — skipping search")
+            _say(f"[SendMessage] Already in {receiver}'s chat — skipping search")
         else:
-            print(f"[SendMessage] Searching for: {receiver}")
+            _say(f"[SendMessage] Searching for: {receiver}")
             pyautogui.hotkey("ctrl", "f")
             time.sleep(0.5)
             pyautogui.hotkey("ctrl", "a")
@@ -133,6 +193,13 @@ def _send_whatsapp(receiver: str, message: str) -> str:
             time.sleep(1.0)
             pyautogui.press("enter")
             time.sleep(0.8)
+
+        # final guard: never type the message into the wrong window
+        if not _whatsapp_still_focused(hwnd):
+            hwnd, _ = _focus_whatsapp(timeout=2.0)
+            if not hwnd:
+                return ("Lost focus on the WhatsApp window before typing — "
+                        "message not sent.")
 
         pyautogui.write(message, interval=0.03)
         time.sleep(0.2)
@@ -158,6 +225,25 @@ def _open_app(app_name: str):
         time.sleep(0.5)
         pyautogui.press("enter")
         time.sleep(2.5)
+
+
+def _open_and_focus(app_name: str, timeout: float = 2.0) -> bool:
+    """Open (or surface) an app and confirm its window holds focus.
+
+    Returns False only after the window failed to appear/focus within
+    `timeout` — callers must NOT send keystrokes in that case.
+    """
+    _open_app(app_name)
+    try:
+        from actions.open_app import _focus_window_windows
+        if _focus_window_windows(app_name, timeout=timeout):
+            time.sleep(0.5)            # let the app finish drawing its UI
+            return True
+        return False
+    except Exception:
+        # non-Windows or helper unavailable — fall back to a settle delay
+        time.sleep(1.5)
+        return True
 
 
 def _send_instagram(receiver: str, message: str) -> str:
@@ -186,8 +272,8 @@ def _send_instagram(receiver: str, message: str) -> str:
 
 def _send_telegram(receiver: str, message: str) -> str:
     try:
-        _open_app("telegram")
-        time.sleep(1.5)
+        if not _open_and_focus("telegram", timeout=4.0):
+            return "Could not find or focus the Telegram window."
         pyautogui.hotkey("ctrl", "f")
         time.sleep(0.4)
         pyautogui.write(receiver, interval=0.04)
@@ -204,8 +290,8 @@ def _send_telegram(receiver: str, message: str) -> str:
 
 def _send_generic(platform: str, receiver: str, message: str) -> str:
     try:
-        _open_app(platform)
-        time.sleep(1.5)
+        if not _open_and_focus(platform, timeout=4.0):
+            return f"Could not find or focus the {platform} window."
         pyautogui.hotkey("ctrl", "f")
         time.sleep(0.4)
         pyautogui.write(receiver, interval=0.04)
@@ -240,7 +326,7 @@ def send_message(
     if not message_text:
         return "Please specify what message to send, sir."
 
-    print(f"[SendMessage] 📨 {platform} → {receiver}: {message_text[:40]}")
+    _say(f"[SendMessage] 📨 {platform} → {receiver}: {message_text[:40]}")
     if player:
         player.write_log(f"[msg] Sending to {receiver} via {platform}...")
 
@@ -253,7 +339,7 @@ def send_message(
     else:
         result = _send_generic(platform, receiver, message_text)
 
-    print(f"[SendMessage] ✅ {result}")
+    _say(f"[SendMessage] ✅ {result}")
     if player:
         player.write_log(f"[msg] {result}")
 

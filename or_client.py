@@ -85,9 +85,8 @@ class OpenRouterClient:
         self.api_key  = _load_api_key()
         self._headers = {
             "Authorization": f"Bearer {self.api_key}",
-            "Content-Type":  "application/json",
-            "HTTP-Referer":  "https://github.com/mark-xxv",
-            "X-Title":       "MARK XXV",
+            "HTTP-Referer":  "https://github.com/flint-ai",
+            "X-Title":       "FLINT",
         }
 
     def _is_rate_limited(self, model: str) -> bool:
@@ -199,7 +198,7 @@ class OpenRouterClient:
         self,
         prompt: str,
         system: str = (
-            "You are a component of MARK XXV, an AI assistant inspired by FLINT. "
+            "You are a component of FLINT, an AI assistant. "
             "Be concise, helpful, and precise."
         ),
         model: Optional[str] = None,
@@ -354,8 +353,8 @@ if __name__ == "__main__":
     try:
         history = [
             {"role": "system",    "content": "You are a helpful assistant. Be brief."},
-            {"role": "user",      "content": "My name is Rishi."},
-            {"role": "assistant", "content": "Hello Rishi, how can I help you?"},
+            {"role": "user",      "content": "My name is rishi."},
+            {"role": "assistant", "content": "Hello rishi, how can I help you?"},
             {"role": "user",      "content": "What is my name?"},
         ]
         reply = client.multi_turn(history)
