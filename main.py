@@ -489,10 +489,8 @@ class FlintLive:
         try:
             while True:
                 chunk = await self.audio_in_queue.get()
-                self.set_speaking(True)
                 await asyncio.to_thread(stream.write, chunk)
         finally:
-            self.set_speaking(False)
             stream.stop()
             stream.close()
 

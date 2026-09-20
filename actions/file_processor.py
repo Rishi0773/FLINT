@@ -321,7 +321,6 @@ def _process_text_doc(path: Path, file_type: str, action: str,
     }
 
     if action not in prompt_map:
-
         action  = "custom"
         instruction = action
 
@@ -376,9 +375,7 @@ def _process_data(path: Path, file_type: str, action: str,
                    f"Rows: {len(df)}\nPreview:\n{preview}\n\n"
                    f"Give insights, patterns, and notable findings.")
         try:
-            model    = _gemini_client()
-            response = model.generate_content(prompt)
-            return response.text.strip()
+            return _gemini_generate(prompt)
         except Exception as e:
             return f"AI analysis failed: {e}"
 
@@ -806,10 +803,8 @@ def _process_pptx(path: Path, action: str, params: dict, speak=None) -> str:
             out.write_text(text, encoding="utf-8")
             return f"Text extracted. Saved: {out.name}"
         try:
-            model    = _gemini_client()
             prompt   = f"{'Summarize' if action == 'summarize' else 'Analyze'} this presentation:\n{text[:30000]}"
-            response = model.generate_content(prompt)
-            return response.text.strip()
+            return _gemini_generate(prompt)
         except Exception as e:
             return f"AI processing failed: {e}"
 
@@ -839,10 +834,8 @@ def file_processor(parameters: dict, player=None, speak=None) -> str:
     if file_type == "unknown":
         try:
             content = path.read_text(encoding="utf-8", errors="ignore")[:10000]
-            model   = _gemini_client()
             prompt  = f"File: {path.name}\nContent preview:\n{content}\n\nTask: {action or instruction or 'Describe what this file contains and what can be done with it.'}"
-            response = model.generate_content(prompt)
-            return response.text.strip()
+            return _gemini_generate(prompt)
         except Exception as e:
             return f"Unknown file type ({path.suffix}). Could not process: {e}"
 
