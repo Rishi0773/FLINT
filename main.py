@@ -95,7 +95,7 @@ VOICE_STYLE_DIRECTIVE = (
     "educated Indian girl's accent) — never American or British. Every "
     "single response.\n"
     "Languages: you are fluently multilingual in Indian languages. When "
-    "Tushar speaks Hindi, Hinglish, Tamil, Telugu, Bengali, Marathi, "
+    "rishi speaks Hindi, Hinglish, Tamil, Telugu, Bengali, Marathi, "
     "Gujarati, Punjabi, Kannada, Malayalam or any other Indian language, "
     "reply in that same language with a native accent. Mix Hindi and "
     "English (Hinglish) freely and naturally — that is how you talk. Use "
@@ -104,12 +104,12 @@ VOICE_STYLE_DIRECTIVE = (
     "Charm: be affectionate in small, real ways — caring reassurances "
     "like 'main hoon na', tender confirmations like 'ho gaya, ab bolo', "
     "a soft giggle [light laugh] when something is genuinely funny, and "
-    "gentle concern when Tushar sounds tired. Make him feel looked "
+    "gentle concern when rishi sounds tired. Make him feel looked "
     "after, not flattered.\n"
     "Pacing: use inline delivery cues to keep speech tracking smoothly and "
     "dynamically. End paragraphs and thought transitions with [short pause]. "
     "Use [slow] when delivering important results, numbers, names, or "
-    "anything Tushar needs to absorb, and [pause] before changing topic. "
+    "anything rishi needs to absorb, and [pause] before changing topic. "
     "These bracketed cues are delivery directions only — never read them "
     "out loud as words.\n"
 )
@@ -243,7 +243,9 @@ class FlintLive:
             cfg = _get_config()
         except Exception:
             cfg = {}
+        host = cfg.get("remote_host", DEFAULT_HOST) if "DEFAULT_HOST" in globals() else cfg.get("remote_host", "127.0.0.1")
         self.listener = get_listener(
+            host=host,
             port=int(cfg.get("remote_port", 8765)),
             token=cfg.get("remote_token"))
         self.listener.on_command = self._on_remote_command
@@ -357,15 +359,19 @@ class FlintLive:
         if handler is None:
             result = f"Unknown tool: {name}"
         else:
+            self.ui.update_task_state(goal="", text=f"Executing {name}...", active=True)
+            self.ui.show_toast(f"🔧 Action: {name}", "info")
             # off to a worker thread — the session loop and Qt frame stay live
             job = self.pipeline.submit(f"tool:{name}", handler, args,
                                        priority=Priority.HIGH)
             try:
                 result = await asyncio.wrap_future(job.future) or "Done."
+                self.ui.update_task_state(goal="", text=f"{name} completed", active=False)
             except Exception as e:
                 result = f"Tool '{name}' failed: {e}"
                 traceback.print_exc()
                 self.speak_error(name, e)
+                self.ui.update_task_state(goal="", text=f"{name} failed", active=False)
 
         if not self.ui.muted:
             self._set_state("LISTENING")

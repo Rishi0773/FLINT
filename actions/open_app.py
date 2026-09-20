@@ -1,5 +1,5 @@
-﻿# actions/open_app.py
-# MARK XXVI — Cross-Platform App Launcher
+# actions/open_app.py
+# FLINT — Cross-Platform App Launcher
 
 import time
 import subprocess

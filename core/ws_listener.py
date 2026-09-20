@@ -1,4 +1,4 @@
-﻿"""WebSocket command listener — the bridge for the upcoming smartphone app.
+"""WebSocket command listener — the bridge for the upcoming smartphone app.
 
 Runs a small JSON-over-WebSocket server on its own thread + event loop.
 Phone clients connect, optionally authenticate with a shared token, and can
@@ -44,7 +44,7 @@ try:
 except ImportError:
     _WS_OK = False
 
-DEFAULT_HOST = "0.0.0.0"
+DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 
 
